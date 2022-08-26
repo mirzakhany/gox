@@ -1,4 +1,4 @@
-package common
+package gox
 
 import (
 	"log"
