@@ -1,4 +1,4 @@
-module github.com/mirzakhany/x
+module github.com/mirzakhany/gox
 
 go 1.18
 
