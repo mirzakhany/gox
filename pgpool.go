@@ -38,7 +38,7 @@ func NewPgPool(ctx context.Context, c *ConnConfig) (*pgxpool.Pool, error) {
 	conf.ConnConfig.User = c.User
 	conf.ConnConfig.Password = c.Password
 
-	pool, err := pgxpool.Connect(ctx, conf.ConnString())
+	pool, err := pgxpool.ConnectConfig(ctx, conf)
 	if err != nil {
 		return nil, err
 	}
