@@ -1,4 +1,4 @@
-package gox
+package store
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/mirzakhany/gox/os"
 )
 
 const defaultDSN = "user=test password=test host=localhost port=5432 dbname=test sslmode=disable"
@@ -22,7 +23,7 @@ type ConnConfig struct {
 func NewPgPool(ctx context.Context, c *ConnConfig) (*pgxpool.Pool, error) {
 	if c == nil {
 		c = &ConnConfig{}
-		if err := LoadFromEnv(c); err != nil {
+		if err := os.LoadFromEnv(c); err != nil {
 			return nil, err
 		}
 	}
