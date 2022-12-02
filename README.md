@@ -1,1 +1,1 @@
-This is X, a collection of utilities to build services faster with go
+This is GoX, a collection of utilities to build services faster with go
