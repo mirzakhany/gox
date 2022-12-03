@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -18,59 +18,66 @@ import (
 	"go.uber.org/zap"
 )
 
-const gracefulShutdownSec = 5
-
 // RunHttpServer starts a http server on given port. handler will be created when making the http.Server object.
 // it will be a blocking call and will do gracefully shutdown the server when given context canceled.
 // example:
 //
-//	x.RunHttpServer(ctx, logger, cfg.HTTPPort, func(router chi.Router) http.Handler {
+//	gox.RunHttpServer(ctx, func(router chi.Router) http.Handler {
 //		return SetupRouter(router).Handler
-//	})
-func RunHttpServer(ctx context.Context, logger *zap.Logger, port string, createHandler func(router chi.Router) http.Handler) {
+//	}, WithPort("9090"))
+func RunHttpServer(ctx context.Context, createHandler func(router chi.Router) http.Handler, options ...Option) {
+	nopLogger := zap.NewNop()
+	cfg := &config{
+		port:   DefaultPort,
+		logger: nopLogger,
+	}
+
+	for _, o := range options {
+		if err := o(cfg); err != nil {
+			log.Fatalf("Run HTTP server failed %e", err)
+		}
+	}
+
 	apiRouter := chi.NewRouter()
-	setDefaultMiddlewares(logger, apiRouter)
+	if len(cfg.middlewares) == 0 {
+		// set default middlewares
+		apiRouter.Use(DefaultMiddlewares()...)
+	}
+
+	if !cfg.setCors {
+		apiRouter.Use(cors.New(DefaultCorsOption()).Handler)
+	}
+
+	if cfg.logger == nopLogger {
+		log.Println("WARN: no logger is set")
+	} else {
+		apiRouter.Use(RequestLogger(cfg.logger))
+	}
 
 	srv := &http.Server{
-		Addr:    net.JoinHostPort("", port),
+		Addr:    net.JoinHostPort("", cfg.port),
 		Handler: createHandler(apiRouter),
 	}
 
 	go func() {
-		logger.Info("Start http server", zap.String("port", port))
+		cfg.logger.Info("Start http server", zap.String("port", cfg.port))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Start HTTP server failed", zap.Error(err))
+			cfg.logger.Fatal("Start HTTP server failed", zap.Error(err))
 		}
 	}()
 
 	<-ctx.Done()
-	logger.Info("Http Server received a shutdown signal", zap.Int("gracefulShutdownSec", gracefulShutdownSec))
+	cfg.logger.Info("Http Server received a shutdown signal", zap.Int("gracefulShutdownSec", DefaultGracefulShutdownSec))
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), gracefulShutdownSec*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), DefaultGracefulShutdownSec*time.Second)
 	defer func() {
 		cancel()
 	}()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Fatal("http server shutdown failed", zap.Error(err))
+		cfg.logger.Fatal("http server shutdown failed", zap.Error(err))
 	}
-	logger.Info("Http Server exited properly")
-}
-
-func setDefaultMiddlewares(logger *zap.Logger, r *chi.Mux) {
-	r.Use(middleware.Timeout(60 * time.Second))
-	r.Use(RequestLogger(logger))
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Recoverer)
-
-	addCorsMiddleware(r)
-
-	r.Use(
-		middleware.SetHeader("X-Content-Type-Options", "nosniff"),
-		middleware.SetHeader("X-Frame-Options", "deny"),
-	)
-	r.Use(middleware.NoCache)
+	cfg.logger.Info("Http Server exited properly")
 }
 
 func WriteJSON(w http.ResponseWriter, code int, v interface{}) {
@@ -210,19 +217,24 @@ func RequestLogger(logger *zap.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-func addCorsMiddleware(router *chi.Mux) {
-	allowedOrigins := strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), ";")
-	if len(allowedOrigins) == 0 {
-		return
-	}
-
-	corsMiddleware := cors.New(cors.Options{
-		AllowedOrigins:   allowedOrigins,
+func DefaultCorsOption() cors.Options {
+	return cors.Options{
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
-	})
-	router.Use(corsMiddleware.Handler)
+	}
+}
+
+func DefaultMiddlewares() []func(next http.Handler) http.Handler {
+	return []func(next http.Handler) http.Handler{
+		middleware.Timeout(60 * time.Second),
+		middleware.RequestID,
+		middleware.RealIP,
+		middleware.Recoverer,
+		middleware.SetHeader("X-Content-Type-Options", "nosniff"),
+		middleware.SetHeader("X-Frame-Options", "deny"),
+		middleware.NoCache,
+	}
 }
