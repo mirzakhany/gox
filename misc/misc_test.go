@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestToPtr(t *testing.T) {
+func TestPointer(t *testing.T) {
 	cases := []struct {
 		Name  string
 		Input any
@@ -33,7 +33,7 @@ func TestToPtr(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			v := c.Input
-			p := ToPtr(v)
+			p := Pointer(v)
 			if v != *p {
 				t.Fatalf("given %s, got: %s \n", v, *p)
 			}

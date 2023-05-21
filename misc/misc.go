@@ -1,6 +1,6 @@
 package misc
 
-func ToPtr[T any](t T) *T {
+func Pointer[T any](t T) *T {
 	return &t
 }
 
@@ -33,4 +33,11 @@ func Index[T comparable](in []T, target T) int {
 		}
 	}
 	return -1
+}
+
+func Must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
 }

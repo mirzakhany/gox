@@ -18,7 +18,7 @@ import (
 //		}
 //
 //	    cfg := config{}
-//		if err := x.LoadFromEnv(&cfg); err != nil {
+//		if err := gox.LoadFromEnv(&cfg); err != nil {
 //			 ...
 //		}
 func LoadFromEnv(config interface{}) error {
