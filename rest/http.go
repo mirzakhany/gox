@@ -49,6 +49,7 @@ func RunHttpServer(ctx context.Context, createHandler func(router chi.Router) ht
 	}
 
 	if cfg.logger == nopLogger {
+		// TODO fixme: there are use cases when there not need for a logger, like metrics and liveliness endpoints
 		log.Println("WARN: no logger is set")
 	} else {
 		apiRouter.Use(RequestLogger(cfg.logger))
