@@ -2,7 +2,9 @@ package probe
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"time"
 )
 
 type Type int
@@ -22,7 +24,14 @@ func WithProbe(probeType Type, handler func() error) Probe {
 }
 
 func New(router *http.ServeMux, probes ...Probe) http.Handler {
-	router.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+	var mux *http.ServeMux
+	if router == nil {
+		mux = http.NewServeMux()
+	} else {
+		mux = router
+	}
+
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
 		if err := checkProbes(probes, Readiness); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"status": "%s"}`, err)))
@@ -32,7 +41,7 @@ func New(router *http.ServeMux, probes ...Probe) http.Handler {
 		_, _ = w.Write([]byte(`{"status": "ready"}`))
 	})
 
-	router.HandleFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
 		if err := checkProbes(probes, Aliveness); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"status": "%s"}`, err)))
@@ -42,7 +51,17 @@ func New(router *http.ServeMux, probes ...Probe) http.Handler {
 		_, _ = w.Write([]byte(`{"status": "alive"}`))
 	})
 
-	return router
+	return mux
+}
+
+func Run(port string, handler http.Handler) error {
+	httpServer := &http.Server{
+		Addr:              net.JoinHostPort("", port),
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	return httpServer.ListenAndServe()
 }
 
 func checkProbes(probes []Probe, t Type) error {

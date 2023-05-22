@@ -19,7 +19,7 @@ func TestNew(t *testing.T) {
 	}
 
 	{ // Default probe should return success for both readiness and aliveness
-		probeHandler := New(http.NewServeMux())
+		probeHandler := New(nil)
 		readyReq := httptest.NewRequest("GET", "/ready", nil)
 		readyW := httptest.NewRecorder()
 		probeHandler.ServeHTTP(readyW, readyReq)
@@ -35,7 +35,7 @@ func TestNew(t *testing.T) {
 
 	{
 		// ready handler should return error
-		probeHandler := New(http.NewServeMux(), WithProbe(Readiness, readyProbe), WithProbe(Aliveness, liveProbe))
+		probeHandler := New(nil, WithProbe(Readiness, readyProbe), WithProbe(Aliveness, liveProbe))
 		readyReq := httptest.NewRequest("GET", "/ready", nil)
 		readyW := httptest.NewRecorder()
 		probeHandler.ServeHTTP(readyW, readyReq)
